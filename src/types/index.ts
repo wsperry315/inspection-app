@@ -55,7 +55,7 @@ export interface InspectionItem {
   condition: Condition | null;
   notes: string | null;
   sort_order: number;
-  photos?: InspectionPhoto[];
+  photos?: { id: string; storage_path: string; caption: string | null; item_id?: string; created_at?: string }[];
 }
 
 export interface InspectionPhoto {
