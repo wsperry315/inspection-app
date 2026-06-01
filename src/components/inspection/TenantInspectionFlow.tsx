@@ -61,7 +61,7 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
     });
   }
 
-  async function updateItem(roomId: string, itemId: string, patch: Partial<InspectionItem>) {
+  async function updateItem(roomId: string, itemId: string, patch: Partial<RoomItem>) {
     setRooms(patchRoom(roomId, itemId, patch));
     await supabase.from("inspection_items").update(patch).eq("id", itemId);
     if (inspection.status === "pending") {
