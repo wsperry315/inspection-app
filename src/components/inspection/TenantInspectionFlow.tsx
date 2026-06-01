@@ -1,13 +1,21 @@
 "use client";
 import { useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { InspectionRoom, InspectionItem, Condition } from "@/types";
+import { InspectionRoom, Condition } from "@/types";
 import { ChevronLeft, ChevronRight, Camera, CheckCircle2, ClipboardCheck } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { useDropzone } from "react-dropzone";
 
 type Photo = { id: string; storage_path: string; caption: string | null };
-type RoomItem = InspectionItem & { photos: Photo[] };
+type RoomItem = {
+  id: string;
+  room_id: string;
+  name: string;
+  condition: Condition | null;
+  notes: string | null;
+  sort_order: number;
+  photos: Photo[];
+};
 type Room = InspectionRoom & { items: RoomItem[] };
 
 interface Props {
@@ -48,7 +56,7 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
       if (r.id !== roomId) return r;
       return {
         ...r,
-        items: r.items.map((i): RoomItem => (i.id === itemId ? { ...i, ...patch, photos: i.photos } : i)),
+        items: r.items.map((i): RoomItem => (i.id === itemId ? { ...i, ...patch, photos: i.photos ?? [] } : i)),
       };
     });
   }
