@@ -52,7 +52,16 @@ export function NewInspectionButton({ propertyId }: { propertyId: string }) {
           );
         }
       }
-      setLink(`${window.location.origin}/tenant/inspect/${insp.id}`);
+      const inspUrl = `${window.location.origin}/tenant/inspect/${insp.id}`;
+      setLink(inspUrl);
+
+      // Auto-send email to tenant
+      await fetch("/api/send-inspection", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ inspectionId: insp.id }),
+      });
+
       router.refresh();
     }
     setSaving(false);
@@ -70,8 +79,9 @@ export function NewInspectionButton({ propertyId }: { propertyId: string }) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
         <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6">
-          <h2 className="font-semibold text-gray-900 mb-4">Inspection link created! 🎉</h2>
-          <p className="text-sm text-gray-600 mb-3">Share this link with the tenant:</p>
+          <h2 className="font-semibold text-gray-900 mb-2">Inspection created! 🎉</h2>
+          <p className="text-sm text-green-600 mb-3">✅ Email sent to {form.tenant_email}</p>
+          <p className="text-sm text-gray-600 mb-3">You can also share this link directly:</p>
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3 font-mono text-xs break-all select-all mb-3">
             {link}
           </div>
