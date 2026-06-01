@@ -56,7 +56,7 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
       if (r.id !== roomId) return r;
       return {
         ...r,
-        items: r.items.map((i): RoomItem => (i.id === itemId ? { ...i, ...patch, photos: i.photos ?? [] } : i)),
+        items: r.items.map((i): RoomItem => (i.id === itemId ? { ...i, ...patch, photos: i.photos ?? [] } : { ...i, photos: i.photos ?? [] })),
       };
     });
   }
