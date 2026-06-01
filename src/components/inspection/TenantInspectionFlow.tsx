@@ -6,7 +6,9 @@ import { ChevronLeft, ChevronRight, Camera, CheckCircle2, ClipboardCheck } from 
 import SignatureCanvas from "react-signature-canvas";
 import { useDropzone } from "react-dropzone";
 
-type Room = InspectionRoom & { items: (InspectionItem & { photos: { id: string; storage_path: string; caption: string | null }[] })[] };
+type Photo = { id: string; storage_path: string; caption: string | null };
+type RoomItem = InspectionItem & { photos: Photo[] };
+type Room = InspectionRoom & { items: RoomItem[] };
 
 interface Props {
   inspection: {
@@ -41,14 +43,18 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
 
   const property = inspection.property;
 
+  function patchRoom(roomId: string, itemId: string, patch: Partial<RoomItem>): Room[] {
+    return rooms.map((r): Room => {
+      if (r.id !== roomId) return r;
+      return {
+        ...r,
+        items: r.items.map((i): RoomItem => (i.id === itemId ? { ...i, ...patch } : i)),
+      };
+    });
+  }
+
   async function updateItem(roomId: string, itemId: string, patch: Partial<InspectionItem>) {
-    setRooms((prev) =>
-      prev.map((r) =>
-        r.id === roomId
-          ? { ...r, items: r.items.map((i) => (i.id === itemId ? { ...i, ...patch } : i)) }
-          : r
-      )
-    );
+    setRooms(patchRoom(roomId, itemId, patch));
     await supabase.from("inspection_items").update(patch).eq("id", itemId);
     if (inspection.status === "pending") {
       await supabase.from("inspections").update({ status: "in_progress" }).eq("id", inspection.id);
@@ -66,11 +72,12 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
         .select()
         .single();
       if (data) {
+        const photo = data as Photo;
         setRooms((prev) =>
-          prev.map((r) => ({
+          prev.map((r): Room => ({
             ...r,
-            items: r.items.map((i) =>
-              i.id === itemId ? { ...i, photos: [...(i.photos ?? []), data] } : i
+            items: r.items.map((i): RoomItem =>
+              i.id === itemId ? { ...i, photos: [...i.photos, photo] } : i
             ),
           }))
         );
@@ -83,9 +90,9 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
     await supabase.storage.from("inspection-photos").remove([path]);
     await supabase.from("inspection_photos").delete().eq("id", photoId);
     setRooms((prev) =>
-      prev.map((r) => ({
+      prev.map((r): Room => ({
         ...r,
-        items: r.items.map((i) =>
+        items: r.items.map((i): RoomItem =>
           i.id === itemId ? { ...i, photos: i.photos.filter((p) => p.id !== photoId) } : i
         ),
       }))
@@ -172,12 +179,10 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
           <p className="text-gray-500 text-sm mb-6">
             By signing below, you confirm this inspection accurately reflects the property&apos;s condition.
           </p>
-
           <div className="card mb-4">
             <label className="label">Tenant name</label>
             <input className="input" value={tenantName} onChange={(e) => setTenantName(e.target.value)} />
           </div>
-
           <div className="card">
             <p className="text-sm font-medium text-gray-700 mb-2">Signature</p>
             <div className="border-2 border-dashed border-gray-300 rounded-lg bg-white">
@@ -187,23 +192,15 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
                 backgroundColor="white"
               />
             </div>
-            <button
-              onClick={() => sigRef.current?.clear()}
-              className="text-xs text-gray-500 hover:text-gray-700 mt-2"
-            >
+            <button onClick={() => sigRef.current?.clear()} className="text-xs text-gray-500 hover:text-gray-700 mt-2">
               Clear
             </button>
           </div>
-
           <div className="flex gap-3 mt-6">
             <button onClick={() => setStep("rooms")} className="btn-secondary flex-1">
               <ChevronLeft className="w-4 h-4" /> Back
             </button>
-            <button
-              onClick={submit}
-              disabled={saving}
-              className="btn-primary flex-1"
-            >
+            <button onClick={submit} disabled={saving} className="btn-primary flex-1">
               {saving ? "Submitting…" : "Submit inspection"}
             </button>
           </div>
@@ -218,22 +215,18 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
   return (
     <div className="min-h-screen bg-gray-50 pb-24">
       <InspectionHeader inspection={inspection} property={property} />
-
-      {/* Progress bar */}
       <div className="h-1 bg-gray-200">
         <div
           className="h-1 bg-primary-600 transition-all"
           style={{ width: `${((roomIdx + 1) / rooms.length) * 100}%` }}
         />
       </div>
-
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-xl font-bold text-gray-900">{room.name}</h2>
           <span className="text-sm text-gray-500">Room {roomIdx + 1} of {rooms.length}</span>
         </div>
         <p className="text-sm text-gray-500 mb-6">Rate each item and add photos if needed</p>
-
         <div className="space-y-4">
           {room.items.map((item) => (
             <ItemCard
@@ -248,8 +241,6 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
           ))}
         </div>
       </div>
-
-      {/* Fixed bottom nav */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
         <div className="max-w-2xl mx-auto flex gap-3">
           <button
@@ -298,7 +289,7 @@ function ItemCard({
   onPhotoAdd,
   onPhotoRemove,
 }: {
-  item: Room["items"][0];
+  item: RoomItem;
   uploading: boolean;
   onConditionChange: (c: Condition) => void;
   onNotesChange: (n: string) => void;
@@ -322,15 +313,10 @@ function ItemCard({
     <div className="card">
       <div className="flex items-center justify-between mb-3">
         <h3 className="font-medium text-gray-800">{item.name}</h3>
-        <button
-          onClick={() => setShowNotes((v) => !v)}
-          className="text-xs text-gray-400 hover:text-gray-600"
-        >
+        <button onClick={() => setShowNotes((v) => !v)} className="text-xs text-gray-400 hover:text-gray-600">
           {showNotes ? "Hide notes" : "+ Notes"}
         </button>
       </div>
-
-      {/* Condition selector */}
       <div className="flex flex-wrap gap-2 mb-3">
         {CONDITIONS.map((c) => (
           <button
@@ -346,7 +332,6 @@ function ItemCard({
           </button>
         ))}
       </div>
-
       {showNotes && (
         <textarea
           className="input text-sm resize-none mb-3"
@@ -356,9 +341,7 @@ function ItemCard({
           onBlur={(e) => onNotesChange(e.target.value)}
         />
       )}
-
-      {/* Photos */}
-      {item.photos && item.photos.length > 0 && (
+      {item.photos.length > 0 && (
         <div className="flex gap-2 flex-wrap mb-3">
           {item.photos.map((p) => (
             <div key={p.id} className="relative group">
@@ -378,8 +361,6 @@ function ItemCard({
           ))}
         </div>
       )}
-
-      {/* Drop zone */}
       <div
         {...getRootProps()}
         className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors text-xs ${
@@ -388,11 +369,7 @@ function ItemCard({
       >
         <input {...getInputProps()} />
         <Camera className="w-4 h-4 mx-auto mb-1 text-gray-400" />
-        {uploading ? (
-          <p className="text-gray-500">Uploading…</p>
-        ) : (
-          <p className="text-gray-400">Tap to add photo</p>
-        )}
+        {uploading ? <p className="text-gray-500">Uploading…</p> : <p className="text-gray-400">Tap to add photo</p>}
       </div>
     </div>
   );
