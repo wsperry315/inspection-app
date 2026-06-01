@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Send, ClipboardCheck, CheckCircle2, Clock, Home } from "lucide-react";
 import { NewInspectionButton } from "./NewInspectionButton";
+import { PropertyActions } from "./PropertyActions";
 
 export default async function PropertyDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -44,7 +45,10 @@ export default async function PropertyDetailPage({ params }: { params: Promise<{
               </div>
             </div>
           </div>
-          <NewInspectionButton propertyId={property.id} />
+          <div className="flex items-center gap-2">
+            <PropertyActions property={property} />
+            <NewInspectionButton propertyId={property.id} />
+          </div>
         </div>
       </div>
 

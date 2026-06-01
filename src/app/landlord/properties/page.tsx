@@ -2,13 +2,14 @@
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { Property, Inspection } from "@/types";
-import { Plus, Home, ChevronRight, Trash2, Send, Upload } from "lucide-react";
+import { Plus, Home, ChevronRight, Trash2, Send, Upload, Search } from "lucide-react";
 import Link from "next/link";
 
 type PropertyWithInspections = Property & { inspections: Inspection[] };
 
 export default function PropertiesPage() {
   const [properties, setProperties] = useState<PropertyWithInspections[]>([]);
+  const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [showInspect, setShowInspect] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -28,9 +29,13 @@ export default function PropertiesPage() {
 
   useEffect(() => { load(); }, []);
 
+  const filtered = properties.filter((p) =>
+    `${p.name} ${p.address} ${p.city}`.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div className="p-8">
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Properties</h1>
           <p className="text-gray-500">Manage your rental units and send inspection links</p>
@@ -45,9 +50,26 @@ export default function PropertiesPage() {
         </div>
       </div>
 
+      {/* Search bar */}
+      <div className="relative mb-6">
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+        <input
+          type="text"
+          className="input pl-9 w-full max-w-md"
+          placeholder="Search by address, city, or name…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        {search && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+            {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+          </span>
+        )}
+      </div>
+
       {loading ? (
         <p className="text-gray-500">Loading…</p>
-      ) : properties.length === 0 ? (
+      ) : filtered.length === 0 ? (
         <div className="card text-center py-16">
           <Home className="w-12 h-12 mx-auto text-gray-300 mb-4" />
           <p className="font-medium text-gray-900">No properties yet</p>
@@ -58,7 +80,7 @@ export default function PropertiesPage() {
         </div>
       ) : (
         <div className="space-y-4">
-          {properties.map((p) => (
+          {filtered.map((p) => (
             <div key={p.id} className="card">
               <div className="flex items-start justify-between">
                 <div>
