@@ -1,12 +1,20 @@
 "use client";
 import { useState, useRef, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { InspectionRoom, Condition } from "@/types";
 import { ChevronLeft, ChevronRight, Camera, CheckCircle2, ClipboardCheck } from "lucide-react";
 import SignatureCanvas from "react-signature-canvas";
 import { useDropzone } from "react-dropzone";
 
-type Photo = { id: string; storage_path: string; caption: string | null };
+// Fully self-contained types — no external type imports to avoid conflicts
+type Condition = "excellent" | "good" | "fair" | "poor" | "na";
+
+type Photo = {
+  id: string;
+  storage_path: string;
+  caption: string | null;
+  [key: string]: unknown; // allow extra fields from DB
+};
+
 type RoomItem = {
   id: string;
   room_id: string;
@@ -15,17 +23,27 @@ type RoomItem = {
   notes: string | null;
   sort_order: number;
   photos: Photo[];
+  [key: string]: unknown;
 };
-type Room = InspectionRoom & { items: RoomItem[] };
+
+type Room = {
+  id: string;
+  inspection_id: string;
+  name: string;
+  sort_order: number;
+  items: RoomItem[];
+};
+
+interface InspectionProps {
+  id: string;
+  type: string;
+  status: string;
+  tenant_name: string | null;
+  property?: { name: string; address: string; city: string; state: string } | null;
+}
 
 interface Props {
-  inspection: {
-    id: string;
-    type: string;
-    status: string;
-    tenant_name: string | null;
-    property?: { name: string; address: string; city: string; state: string } | null;
-  };
+  inspection: InspectionProps;
   initialRooms: Room[];
 }
 
@@ -37,8 +55,34 @@ const CONDITIONS: { value: Condition; label: string; color: string }[] = [
   { value: "na", label: "N/A", color: "bg-gray-100 text-gray-500 border-gray-300" },
 ];
 
+// Normalize a room from DB (photos may be missing or have extra fields)
+function normalizeRoom(r: Record<string, unknown>): Room {
+  const items = ((r.items as Record<string, unknown>[]) ?? []).map((i) => ({
+    id: String(i.id ?? ""),
+    room_id: String(i.room_id ?? ""),
+    name: String(i.name ?? ""),
+    condition: (i.condition as Condition) ?? null,
+    notes: (i.notes as string) ?? null,
+    sort_order: Number(i.sort_order ?? 0),
+    photos: ((i.photos as Record<string, unknown>[]) ?? []).map((p) => ({
+      id: String(p.id ?? ""),
+      storage_path: String(p.storage_path ?? ""),
+      caption: (p.caption as string) ?? null,
+    })),
+  }));
+  return {
+    id: String(r.id ?? ""),
+    inspection_id: String(r.inspection_id ?? ""),
+    name: String(r.name ?? ""),
+    sort_order: Number(r.sort_order ?? 0),
+    items,
+  };
+}
+
 export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
-  const [rooms, setRooms] = useState<Room[]>(initialRooms);
+  const [rooms, setRooms] = useState<Room[]>(
+    (initialRooms as unknown as Record<string, unknown>[]).map(normalizeRoom)
+  );
   const [step, setStep] = useState<"intro" | "rooms" | "sign" | "done">(
     inspection.status === "completed" ? "done" : "intro"
   );
@@ -51,18 +95,14 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
 
   const property = inspection.property;
 
-  function patchRoom(roomId: string, itemId: string, patch: Partial<RoomItem>): Room[] {
-    return rooms.map((r): Room => {
-      if (r.id !== roomId) return r;
-      return {
-        ...r,
-        items: r.items.map((i): RoomItem => (i.id === itemId ? { ...i, ...patch, photos: i.photos ?? [] } : { ...i, photos: i.photos ?? [] })),
-      };
-    });
-  }
-
   async function updateItem(roomId: string, itemId: string, patch: Partial<RoomItem>) {
-    setRooms(patchRoom(roomId, itemId, patch));
+    setRooms((prev) =>
+      prev.map((r): Room =>
+        r.id !== roomId
+          ? r
+          : { ...r, items: r.items.map((i): RoomItem => i.id === itemId ? { ...i, ...patch } : i) }
+      )
+    );
     await supabase.from("inspection_items").update(patch).eq("id", itemId);
     if (inspection.status === "pending") {
       await supabase.from("inspections").update({ status: "in_progress" }).eq("id", inspection.id);
@@ -80,7 +120,11 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
         .select()
         .single();
       if (data) {
-        const photo = data as Photo;
+        const photo: Photo = {
+          id: String((data as Record<string, unknown>).id ?? ""),
+          storage_path: path,
+          caption: null,
+        };
         setRooms((prev) =>
           prev.map((r): Room => ({
             ...r,
@@ -165,11 +209,7 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
                 placeholder="Enter your full name"
               />
             </div>
-            <button
-              onClick={() => setStep("rooms")}
-              disabled={!tenantName.trim()}
-              className="btn-primary w-full mt-4"
-            >
+            <button onClick={() => setStep("rooms")} disabled={!tenantName.trim()} className="btn-primary w-full mt-4">
               Start inspection
             </button>
           </div>
@@ -194,11 +234,7 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
           <div className="card">
             <p className="text-sm font-medium text-gray-700 mb-2">Signature</p>
             <div className="border-2 border-dashed border-gray-300 rounded-lg bg-white">
-              <SignatureCanvas
-                ref={sigRef}
-                canvasProps={{ className: "w-full", height: 180 }}
-                backgroundColor="white"
-              />
+              <SignatureCanvas ref={sigRef} canvasProps={{ className: "w-full", height: 180 }} backgroundColor="white" />
             </div>
             <button onClick={() => sigRef.current?.clear()} className="text-xs text-gray-500 hover:text-gray-700 mt-2">
               Clear
@@ -224,10 +260,7 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
     <div className="min-h-screen bg-gray-50 pb-24">
       <InspectionHeader inspection={inspection} property={property} />
       <div className="h-1 bg-gray-200">
-        <div
-          className="h-1 bg-primary-600 transition-all"
-          style={{ width: `${((roomIdx + 1) / rooms.length) * 100}%` }}
-        />
+        <div className="h-1 bg-primary-600 transition-all" style={{ width: `${((roomIdx + 1) / rooms.length) * 100}%` }} />
       </div>
       <div className="max-w-2xl mx-auto px-4 py-6">
         <div className="flex items-center justify-between mb-1">
@@ -251,11 +284,7 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
       </div>
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
         <div className="max-w-2xl mx-auto flex gap-3">
-          <button
-            onClick={() => setRoomIdx((i) => Math.max(0, i - 1))}
-            disabled={roomIdx === 0}
-            className="btn-secondary flex-1"
-          >
+          <button onClick={() => setRoomIdx((i) => Math.max(0, i - 1))} disabled={roomIdx === 0} className="btn-secondary flex-1">
             <ChevronLeft className="w-4 h-4" /> Previous
           </button>
           {isLast ? (
@@ -273,15 +302,13 @@ export function TenantInspectionFlow({ inspection, initialRooms }: Props) {
   );
 }
 
-function InspectionHeader({ inspection, property }: { inspection: Props["inspection"]; property: Props["inspection"]["property"] }) {
+function InspectionHeader({ inspection, property }: { inspection: InspectionProps; property: InspectionProps["property"] }) {
   return (
     <header className="bg-white border-b border-gray-200 px-4 py-3">
       <div className="max-w-2xl mx-auto flex items-center gap-3">
         <ClipboardCheck className="w-5 h-5 text-primary-600" />
         <div>
-          <p className="font-medium text-sm text-gray-900 capitalize">
-            {inspection.type.replace("_", " ")} Inspection
-          </p>
+          <p className="font-medium text-sm text-gray-900 capitalize">{inspection.type.replace("_", " ")} Inspection</p>
           {property && <p className="text-xs text-gray-500">{property.name}</p>}
         </div>
       </div>
@@ -290,12 +317,7 @@ function InspectionHeader({ inspection, property }: { inspection: Props["inspect
 }
 
 function ItemCard({
-  item,
-  uploading,
-  onConditionChange,
-  onNotesChange,
-  onPhotoAdd,
-  onPhotoRemove,
+  item, uploading, onConditionChange, onNotesChange, onPhotoAdd, onPhotoRemove,
 }: {
   item: RoomItem;
   uploading: boolean;
@@ -307,15 +329,8 @@ function ItemCard({
   const [showNotes, setShowNotes] = useState(!!item.notes);
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  const onDrop = useCallback(
-    (files: File[]) => { if (files[0]) onPhotoAdd(files[0]); },
-    [onPhotoAdd]
-  );
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: { "image/*": [] },
-    maxFiles: 1,
-  });
+  const onDrop = useCallback((files: File[]) => { if (files[0]) onPhotoAdd(files[0]); }, [onPhotoAdd]);
+  const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop, accept: { "image/*": [] }, maxFiles: 1 });
 
   return (
     <div className="card">
@@ -331,9 +346,7 @@ function ItemCard({
             key={c.value}
             onClick={() => onConditionChange(c.value)}
             className={`px-3 py-1 rounded-lg border text-xs font-medium transition-all ${
-              item.condition === c.value
-                ? c.color + " ring-2 ring-offset-1 ring-current"
-                : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
+              item.condition === c.value ? c.color + " ring-2 ring-offset-1 ring-current" : "bg-white border-gray-200 text-gray-600 hover:border-gray-300"
             }`}
           >
             {c.label}
@@ -341,40 +354,25 @@ function ItemCard({
         ))}
       </div>
       {showNotes && (
-        <textarea
-          className="input text-sm resize-none mb-3"
-          rows={2}
-          placeholder="Add notes…"
-          defaultValue={item.notes ?? ""}
-          onBlur={(e) => onNotesChange(e.target.value)}
-        />
+        <textarea className="input text-sm resize-none mb-3" rows={2} placeholder="Add notes…"
+          defaultValue={item.notes ?? ""} onBlur={(e) => onNotesChange(e.target.value)} />
       )}
       {item.photos.length > 0 && (
         <div className="flex gap-2 flex-wrap mb-3">
           {item.photos.map((p) => (
             <div key={p.id} className="relative group">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={`${supabaseUrl}/storage/v1/object/public/inspection-photos/${p.storage_path}`}
-                alt=""
-                className="w-20 h-20 object-cover rounded-lg border border-gray-200"
-              />
-              <button
-                onClick={() => onPhotoRemove(p.id, p.storage_path)}
-                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs hidden group-hover:flex items-center justify-center"
-              >
+              <img src={`${supabaseUrl}/storage/v1/object/public/inspection-photos/${p.storage_path}`} alt=""
+                className="w-20 h-20 object-cover rounded-lg border border-gray-200" />
+              <button onClick={() => onPhotoRemove(p.id, p.storage_path)}
+                className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white rounded-full text-xs hidden group-hover:flex items-center justify-center">
                 ×
               </button>
             </div>
           ))}
         </div>
       )}
-      <div
-        {...getRootProps()}
-        className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors text-xs ${
-          isDragActive ? "border-primary-400 bg-primary-50" : "border-gray-200 hover:border-gray-300"
-        }`}
-      >
+      <div {...getRootProps()} className={`border-2 border-dashed rounded-lg p-3 text-center cursor-pointer transition-colors text-xs ${isDragActive ? "border-primary-400 bg-primary-50" : "border-gray-200 hover:border-gray-300"}`}>
         <input {...getInputProps()} />
         <Camera className="w-4 h-4 mx-auto mb-1 text-gray-400" />
         {uploading ? <p className="text-gray-500">Uploading…</p> : <p className="text-gray-400">Tap to add photo</p>}

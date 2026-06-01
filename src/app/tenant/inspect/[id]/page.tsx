@@ -22,8 +22,10 @@ export default async function TenantInspectPage({ params }: { params: Promise<{ 
 
   return (
     <TenantInspectionFlow
-      inspection={insp}
-      initialRooms={rooms ?? []}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      inspection={insp as any}
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      initialRooms={(rooms ?? []) as any}
     />
   );
 }
