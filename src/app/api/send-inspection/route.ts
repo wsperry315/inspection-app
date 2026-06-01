@@ -17,7 +17,8 @@ export async function POST(req: NextRequest) {
   }
 
   const property = insp.property as { name: string; address: string; city: string; state: string } | null;
-  const inspectionUrl = `${process.env.NEXT_PUBLIC_APP_URL}/tenant/inspect/${inspectionId}`;
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://inspection-app-bay.vercel.app";
+  const inspectionUrl = `${appUrl}/tenant/inspect/${inspectionId}`;
   const type = insp.type === "move_in" ? "Move-In" : "Move-Out";
 
   // Send email via Supabase Edge Function / SMTP

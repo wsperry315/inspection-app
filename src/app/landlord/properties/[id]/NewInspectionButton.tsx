@@ -55,12 +55,16 @@ export function NewInspectionButton({ propertyId }: { propertyId: string }) {
       const inspUrl = `${window.location.origin}/tenant/inspect/${insp.id}`;
       setLink(inspUrl);
 
-      // Auto-send email to tenant
-      await fetch("/api/send-inspection", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ inspectionId: insp.id }),
-      });
+      // Auto-send email to tenant (non-blocking — don't crash if it fails)
+      try {
+        await fetch("/api/send-inspection", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ inspectionId: insp.id }),
+        });
+      } catch (err) {
+        console.error("Email send failed:", err);
+      }
 
       router.refresh();
     }

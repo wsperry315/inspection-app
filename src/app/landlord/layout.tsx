@@ -14,7 +14,8 @@ export default async function LandlordLayout({ children }: { children: React.Rea
     .eq("id", user.id)
     .single();
 
-  if (profile?.role !== "landlord") redirect("/login");
+  // Allow access if profile doesn't exist yet (first login) or role is landlord
+  if (profile && profile.role !== "landlord") redirect("/login");
 
   return (
     <div className="min-h-screen flex">
