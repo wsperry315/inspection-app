@@ -78,7 +78,7 @@ export default async function LandlordDashboard() {
               {inspections.map((insp) => (
                 <tr key={insp.id} className="border-b border-gray-50 hover:bg-gray-50">
                   <td className="py-3 font-medium">
-                    {(insp.property as { name: string } | null)?.name ?? "—"}
+                    {(insp.property as unknown as { name: string } | null)?.name ?? "—"}
                   </td>
                   <td className="py-3 text-gray-600">{insp.tenant_name ?? "—"}</td>
                   <td className="py-3 capitalize text-gray-600">
