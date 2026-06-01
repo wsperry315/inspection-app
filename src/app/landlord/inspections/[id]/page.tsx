@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { CheckCircle2, Clock, ClipboardCheck } from "lucide-react";
 import Link from "next/link";
 import { InspectionPDFDownload } from "@/components/inspection/InspectionPDFDownload";
+import { CopyLinkButton } from "./CopyLinkButton";
 
 export default async function InspectionDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -65,16 +66,17 @@ export default async function InspectionDetailPage({ params }: { params: Promise
 
       {insp.status === "pending" && (
         <div className="card mb-6 bg-yellow-50 border-yellow-200">
-          <div className="flex items-center gap-3">
-            <Clock className="w-5 h-5 text-yellow-600" />
-            <div>
+          <div className="flex items-start gap-3">
+            <Clock className="w-5 h-5 text-yellow-600 mt-0.5" />
+            <div className="flex-1">
               <p className="font-medium text-yellow-800">Awaiting tenant</p>
-              <p className="text-sm text-yellow-700 mt-0.5">
-                Share this link with the tenant:{" "}
-                <code className="bg-yellow-100 px-1 rounded text-xs">
-                  {process.env.NEXT_PUBLIC_APP_URL || ""}/tenant/inspect/{insp.id}
+              <p className="text-sm text-yellow-700 mt-1 mb-2">Share this link with the tenant:</p>
+              <div className="flex items-center gap-2">
+                <code className="bg-yellow-100 border border-yellow-200 px-2 py-1 rounded text-xs flex-1 break-all">
+                  https://inspection-app-bay.vercel.app/tenant/inspect/{insp.id}
                 </code>
-              </p>
+                <CopyLinkButton inspectionId={insp.id} />
+              </div>
             </div>
           </div>
         </div>
