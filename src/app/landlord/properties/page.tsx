@@ -119,7 +119,7 @@ export default function PropertiesPage() {
 }
 
 function AddPropertyModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const [form, setForm] = useState({ name: "", address: "", city: "", state: "", zip: "" });
+  const [form, setForm] = useState({ name: "", address: "", city: "", state: "", zip: "", bedrooms: "3", bathrooms: "2" });
   const [saving, setSaving] = useState(false);
   const supabase = createClient();
 
@@ -155,6 +155,16 @@ function AddPropertyModal({ onClose, onSaved }: { onClose: () => void; onSaved: 
           <div>
             <label className="label">ZIP</label>
             <input className="input" value={form.zip} onChange={(e) => setForm((f) => ({ ...f, zip: e.target.value }))} required />
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="label">Bedrooms</label>
+            <input type="number" className="input" value={form.bedrooms} onChange={(e) => setForm((f) => ({ ...f, bedrooms: e.target.value }))} min="0" max="10" required />
+          </div>
+          <div>
+            <label className="label">Bathrooms</label>
+            <input type="number" className="input" value={form.bathrooms} onChange={(e) => setForm((f) => ({ ...f, bathrooms: e.target.value }))} min="0" max="10" step="0.5" required />
           </div>
         </div>
         <div className="flex gap-3 pt-2">
@@ -193,10 +203,16 @@ function NewInspectionModal({ propertyId, onClose, onSaved }: { propertyId: stri
       .single();
 
     if (insp) {
-      // Seed default rooms and items
-      const { DEFAULT_ROOMS } = await import("@/types");
-      for (let ri = 0; ri < DEFAULT_ROOMS.length; ri++) {
-        const room = DEFAULT_ROOMS[ri];
+      // Get property bed/bath counts to generate TAR-style rooms
+      const { data: prop } = await supabase
+        .from("properties")
+        .select("bedrooms, bathrooms")
+        .eq("id", propertyId)
+        .single();
+      const { buildTARRooms } = await import("@/types");
+      const rooms = buildTARRooms(prop?.bedrooms ?? 3, prop?.bathrooms ?? 2);
+      for (let ri = 0; ri < rooms.length; ri++) {
+        const room = rooms[ri];
         const { data: roomRow } = await supabase
           .from("inspection_rooms")
           .insert({ inspection_id: insp.id, name: room.name, sort_order: ri })

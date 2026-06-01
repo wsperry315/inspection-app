@@ -19,6 +19,8 @@ export interface Property {
   city: string;
   state: string;
   zip: string;
+  bedrooms: number;
+  bathrooms: number;
   created_at: string;
 }
 
@@ -64,46 +66,75 @@ export interface InspectionPhoto {
   created_at: string;
 }
 
-export const DEFAULT_ROOMS = [
-  {
-    name: "Entry / Foyer",
-    items: ["Front Door", "Locks", "Flooring", "Walls", "Ceiling", "Light Fixtures"],
-  },
-  {
-    name: "Living Room",
-    items: ["Flooring", "Walls", "Ceiling", "Windows", "Light Fixtures", "Outlets/Switches"],
-  },
-  {
-    name: "Kitchen",
-    items: [
-      "Countertops",
-      "Cabinets",
-      "Sink & Faucet",
-      "Refrigerator",
-      "Stove/Oven",
-      "Dishwasher",
-      "Flooring",
-      "Walls",
-    ],
-  },
-  {
-    name: "Primary Bedroom",
-    items: ["Flooring", "Walls", "Ceiling", "Closet", "Windows", "Light Fixtures", "Outlets/Switches"],
-  },
-  {
-    name: "Bathroom",
-    items: ["Toilet", "Sink & Faucet", "Shower/Tub", "Mirror", "Flooring", "Walls", "Ventilation Fan"],
-  },
-  {
-    name: "Laundry",
-    items: ["Washer Hookup", "Dryer Hookup", "Flooring", "Walls"],
-  },
-  {
-    name: "Garage / Parking",
-    items: ["Garage Door", "Opener", "Flooring", "Walls"],
-  },
-  {
+const BEDROOM_ITEMS = ["Flooring", "Walls", "Ceiling", "Closet", "Windows", "Light Fixtures", "Outlets/Switches", "Ceiling Fan"];
+const BATHROOM_ITEMS = ["Toilet", "Sink & Faucet", "Shower/Tub", "Mirror", "Flooring", "Walls", "Ventilation Fan", "Towel Bars"];
+
+export function buildTARRooms(bedrooms = 3, bathrooms = 2) {
+  const beds = Math.max(1, Math.round(bedrooms));
+  const baths = Math.max(1, Math.round(bathrooms));
+
+  const rooms: { name: string; items: string[] }[] = [];
+
+  // Exterior
+  rooms.push({
     name: "Exterior",
-    items: ["Front Yard", "Backyard", "Driveway", "Fence", "Gutters"],
-  },
-];
+    items: ["Lawn/Trees/Shrubs", "Driveway/Walkways", "Fences/Gates", "Exterior Walls/Paint", "Roof/Gutters", "Mailbox", "Garage Door/Opener"],
+  });
+
+  // Entry
+  rooms.push({
+    name: "Entry / Foyer",
+    items: ["Front Door", "Locks/Deadbolt", "Flooring", "Walls", "Ceiling", "Light Fixtures", "Coat Closet"],
+  });
+
+  // Living / Dining
+  rooms.push({
+    name: "Living Room",
+    items: ["Flooring", "Walls", "Ceiling", "Windows/Screens", "Light Fixtures", "Outlets/Switches", "Ceiling Fan", "Fireplace"],
+  });
+  rooms.push({
+    name: "Dining Room",
+    items: ["Flooring", "Walls", "Ceiling", "Windows/Screens", "Light Fixtures", "Outlets/Switches"],
+  });
+
+  // Kitchen
+  rooms.push({
+    name: "Kitchen",
+    items: ["Countertops", "Cabinets", "Sink & Faucet", "Disposal", "Refrigerator", "Stove/Oven", "Microwave", "Dishwasher", "Flooring", "Walls", "Light Fixtures"],
+  });
+
+  // Bedrooms
+  for (let i = 1; i <= beds; i++) {
+    rooms.push({
+      name: i === 1 ? "Primary Bedroom" : `Bedroom ${i}`,
+      items: BEDROOM_ITEMS,
+    });
+  }
+
+  // Bathrooms
+  for (let i = 1; i <= baths; i++) {
+    rooms.push({
+      name: i === 1 ? "Primary Bathroom" : `Bathroom ${i}`,
+      items: BATHROOM_ITEMS,
+    });
+  }
+
+  // Utility / Other
+  rooms.push({
+    name: "Laundry Room",
+    items: ["Washer Hookup", "Dryer Hookup", "Flooring", "Walls", "Shelving"],
+  });
+  rooms.push({
+    name: "Utility / Mechanical",
+    items: ["Water Heater", "HVAC/Filters", "Smoke Detectors", "CO Detectors", "Electrical Panel"],
+  });
+  rooms.push({
+    name: "Garage",
+    items: ["Garage Door", "Opener/Remotes", "Flooring", "Walls", "Lighting"],
+  });
+
+  return rooms;
+}
+
+// Fallback default (3bed/2bath)
+export const DEFAULT_ROOMS = buildTARRooms(3, 2);
